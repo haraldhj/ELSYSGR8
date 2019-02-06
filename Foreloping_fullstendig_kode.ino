@@ -15,15 +15,13 @@ const char *appKey = "ADC0FC64BD8E8960175B349BE5CFD3AA";
 #define freqPlan TTN_FP_EU868
     
 TheThingsNetwork ttn(loraSerial, debugSerial, freqPlan);                
-
 /********************************************************************/
-// Data wire is plugged into pin 2 on the Arduino 
+//Definer hvilke pins som blir brukt
 #define ONE_WIRE_BUS 2 
 #define turbPin A0
 volatile int nbr_remaining; 
 /********************************************************************/
 // Setup a oneWire instance to communicate with any OneWire devices  
-// (not just Maxim/Dallas temperature ICs) 
 OneWire oneWire(ONE_WIRE_BUS); 
 /********************************************************************/
 // Pass our oneWire reference to Dallas Temperature. 
@@ -37,7 +35,23 @@ float turbiditet(){
   float data;
   rawData = analogRead(turbPin);  //Leser av data fra pinnen som er definert på toppen av koden
   data = abs(1-(rawData/320));  //Behandler dataen slik at rådata fra sensor gir en turbiditetsgrad mellom 0 og 1. 
-  return ;
+  return data;
+}
+
+float getTemperature(){
+  // call sensors.requestTemperatures() to issue a global temperature 
+ // request to all devices on the bus 
+  Serial.print(" Requesting temperatures..."); 
+  sensors.requestTemperatures(); // Send the command to get temperature readings 
+  Serial.println("DONE"); 
+  /********************************************************************/
+  Serial.print("Temperature is: "); 
+  float temp = sensors.getTempCByIndex(0);
+  Serial.print(temp); // Why "byIndex"?  
+  // You can have more than one DS18B20 on the same bus.  
+  // 0 refers to the first IC on the wire
+  return temp;
+
 }
 
 void setup(void) { 
@@ -63,24 +77,18 @@ void setup(void) {
 } 
 void loop(void) { 
   sleep(2);
-  
- // call sensors.requestTemperatures() to issue a global temperature 
- // request to all devices on the bus 
-/********************************************************************/
-  Serial.print(" Requesting temperatures..."); 
-  sensors.requestTemperatures(); // Send the command to get temperature readings 
-  Serial.println("DONE"); 
-/********************************************************************/
-  Serial.print("Temperature is: "); 
-  float temp = sensors.getTempCByIndex(0);
-  Serial.print(temp); // Why "byIndex"?  
-  // You can have more than one DS18B20 on the same bus.  
-  // 0 refers to the first IC on the wire
+
+  //Henter temperatur
+  float temp = getTemperature();
+  int iTemp = (int) (temp * 100);
+
+  //Henter turbiditet
   float turb = turbiditet();
   int iTurb = (int) (turb*100);
    
+  
   byte data[3];
-  int iTemp = (int) (temp * 100);
+  
   data[0] = highByte(iTemp);
   data[1] = lowByte(iTemp);
   data[2] = iTurb;
@@ -126,9 +134,11 @@ void sleep(int ncycles)
  
 }
 
-/******* Dette må bare være med,       ****
+
+/******* Dette må bare være med, **********
  ******* så ikke interrupt kaller på en ***
- *******  uinitialisert funksjon      ****/
+ *******  uinitialisert funksjon      *****
+ */
 ISR(WDT_vect){
         // not hanging, just waiting
         // reset the watchdog
@@ -136,8 +146,7 @@ ISR(WDT_vect){
 }
 
 
-
-/**********    Konfigurer WDT    ***********/
+/********* Configurer wdt *********/
 void configure_wdt(void)
 {
  

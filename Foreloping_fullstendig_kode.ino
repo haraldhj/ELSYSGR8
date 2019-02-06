@@ -1,6 +1,3 @@
-/********************************************************************/
-
-// First we include the libraries
 #include <OneWire.h> 
 #include <DallasTemperature.h>
 #include <TheThingsNetwork.h>
@@ -14,10 +11,10 @@ const char *appKey = "ADC0FC64BD8E8960175B349BE5CFD3AA";
 #define loraSerial Serial1
 #define debugSerial Serial
 
-// Replace REPLACE_ME with TTN_FP_EU868 or TTN_FP_US915
+// Replace REPLACE_ME with TTN_FP_EU868 or TTN_FP_US915   
 #define freqPlan TTN_FP_EU868
     
-TheThingsNetwork ttn(loraSerial, debugSerial, freqPlan);
+TheThingsNetwork ttn(loraSerial, debugSerial, freqPlan);                
 
 /********************************************************************/
 // Data wire is plugged into pin 2 on the Arduino 
@@ -33,29 +30,68 @@ OneWire oneWire(ONE_WIRE_BUS);
 DallasTemperature sensors(&oneWire);
 /********************************************************************/ 
 
-ISR(WDT_vect)
-{
-        // not hanging, just waiting
-        // reset the watchdog
-        wdt_reset();
+
+//*******     HENT TURBIDITET   *************
+float turbiditet(){
+  float rawData;
+  float data;
+  rawData = analogRead(turbPin);  //Leser av data fra pinnen som er definert på toppen av koden
+  data = abs(1-(rawData/320));  //Behandler dataen slik at rådata fra sensor gir en turbiditetsgrad mellom 0 og 1. 
+  return ;
 }
 
-void configure_wdt(void)
-{
- 
-  cli();                           // disable interrupts for changing the registers
+void setup(void) { 
+   loraSerial.begin(57600);
+  debugSerial.begin(9600);
+    
+  // Wait a maximum of 10s for Serial Monitor
+  while (!debugSerial && millis() < 10000);
+    
+  debugSerial.println("-- STATUS");
+  ttn.showStatus();
+  
+  debugSerial.println("-- JOIN");
+  ttn.join(appEui, appKey);
+  
+ // start serial port 
+ // Serial.begin(9600); 
+ Serial.println("Dallas Temperature IC Control Library Demo"); 
+ // Start up the library 
+ sensors.begin();
 
-  MCUSR = 0;                       // reset status register flags
-
-                                   // Put timer in interrupt-only mode:                                       
-  WDTCSR |= 0b00011000;            // Set WDCE (5th from left) and WDE (4th from left) to enter config mode,
-                                   // using bitwise OR assignment (leaves other bits unchanged).
-  WDTCSR =  0b01000000 | 0b100001; // set WDIE: interrupt enabled
-                                   // clr WDE: reset disabled
-                                   // and set delay interval (right side of bar) to 8 seconds
-
-  sei();                           // re-enable interrupts 
+ configure_wdt();
+} 
+void loop(void) { 
+  sleep(2);
+  
+ // call sensors.requestTemperatures() to issue a global temperature 
+ // request to all devices on the bus 
+/********************************************************************/
+  Serial.print(" Requesting temperatures..."); 
+  sensors.requestTemperatures(); // Send the command to get temperature readings 
+  Serial.println("DONE"); 
+/********************************************************************/
+  Serial.print("Temperature is: "); 
+  float temp = sensors.getTempCByIndex(0);
+  Serial.print(temp); // Why "byIndex"?  
+  // You can have more than one DS18B20 on the same bus.  
+  // 0 refers to the first IC on the wire
+  float turb = turbiditet();
+  int iTurb = (int) (turb*100);
+   
+  byte data[3];
+  int iTemp = (int) (temp * 100);
+  data[0] = highByte(iTemp);
+  data[1] = lowByte(iTemp);
+  data[2] = iTurb;
+    
+  // Send it off
+  ttn.sendBytes(data, sizeof(data));
 }
+
+/**********************************************************************/
+/*****************     SLEEP FUNCTION    ******************************/
+/**********************************************************************/
 
 void sleep(int ncycles)
 {  
@@ -90,62 +126,31 @@ void sleep(int ncycles)
  
 }
 
-float turbiditet(){
-  float rawData;
-  float data;
-  rawData = analogRead(turbPin);  //Leser av data fra pinnen som er definert på toppen av koden
-  data = abs(1-(rawData/320));  //Behandler dataen slik at rådata fra sensor gir en turbiditetsgrad mellom 0 og 1. 
-  return data;
+/******* Dette må bare være med,       ****
+ ******* så ikke interrupt kaller på en ***
+ *******  uinitialisert funksjon      ****/
+ISR(WDT_vect){
+        // not hanging, just waiting
+        // reset the watchdog
+        wdt_reset();
 }
 
-void setup(void) 
-{ 
-   loraSerial.begin(57600);
-  debugSerial.begin(9600);
-    
-  // Wait a maximum of 10s for Serial Monitor
-  while (!debugSerial && millis() < 10000);
-    
-  debugSerial.println("-- STATUS");
-  ttn.showStatus();
-  
-  debugSerial.println("-- JOIN");
-  ttn.join(appEui, appKey);
-  
- // start serial port 
- // Serial.begin(9600); 
- Serial.println("Dallas Temperature IC Control Library Demo"); 
- // Start up the library 
- sensors.begin();
 
- configure_wdt();
-} 
-void loop(void) 
-{ 
-  sleep(2);
-  
-  // call sensors.requestTemperatures() to issue a global temperature 
-  // request to all devices on the bus 
-/********************************************************************/
-  Serial.print(" Requesting temperatures..."); 
-  sensors.requestTemperatures(); // Send the command to get temperature readings 
-  Serial.println("DONE"); 
-/********************************************************************/
-  Serial.print("Temperature is: "); 
-  float temp = sensors.getTempCByIndex(0);
-  Serial.print(temp); // Why "byIndex"?  
-    // You can have more than one DS18B20 on the same bus.  
-    // 0 refers to the first IC on the wire
-  float turb = turbiditet();
-  int iTurb = (int) (turb*100);
-   
-  // Prepare array of 1 byte to indicate LED status
-  byte data[3];
-  int iTemp = (int) (temp * 100);
-  data[0] = highByte(iTemp);
-  data[1] = lowByte(iTemp);
-  data[2] = iTurb;
-    
-  // Send it off
-  ttn.sendBytes(data, sizeof(data));
-} 
+
+/**********    Konfigurer WDT    ***********/
+void configure_wdt(void)
+{
+ 
+  cli();                           // disable interrupts for changing the registers
+
+  MCUSR = 0;                       // reset status register flags
+
+                                   // Put timer in interrupt-only mode:                                       
+  WDTCSR |= 0b00011000;            // Set WDCE (5th from left) and WDE (4th from left) to enter config mode,
+                                   // using bitwise OR assignment (leaves other bits unchanged).
+  WDTCSR =  0b01000000 | 0b100001; // set WDIE: interrupt enabled
+                                   // clr WDE: reset disabled
+                                   // and set delay interval (right side of bar) to 8 seconds
+
+  sei();                           // re-enable interrupts 
+}

@@ -11,6 +11,7 @@ const char *appKey = "ADC0FC64BD8E8960175B349BE5CFD3AA";
 
 #define loraSerial Serial1
 #define debugSerial Serial
+#define led 13
 
 // Replace REPLACE_ME with TTN_FP_EU868 or TTN_FP_US915
 #define freqPlan TTN_FP_EU868
@@ -20,10 +21,11 @@ TheThingsNetwork ttn(loraSerial, debugSerial, freqPlan);
 //Definer hvilke pins som blir brukt
 #define ONE_WIRE_BUS 2
 #define turbPin A0
+#define pHpwr A2
 volatile int nbr_remaining;
 
 #define SensorPin A1            //pH meter Analog output to Arduino Analog Input 0
-#define ArrayLenth  40    //times of collection
+#define ArrayLenth  10    //times of collection
 int pHArray[ArrayLenth];   //Store the average value of the sensor feedback
 int pHArrayIndex=0; 
 
@@ -104,17 +106,39 @@ double avergearray(int* arr, int number){
 /******* Hent pH  **********/
 float getPh()
 {
+  digitalWrite(pHpwr, HIGH);
   static float voltage;
-  for(int i=0;i<40;i++)
+  for(int i=0;i<ArrayLenth;i++)
    {
     
   
     pHArray[pHArrayIndex++]=analogRead(SensorPin);
+      Serial.print(pHArrayIndex);
+      Serial.print(": ");
+      Serial.println(analogRead(SensorPin));
       if(pHArrayIndex==ArrayLenth)pHArrayIndex=0;
-      delay(1500);
+      digitalWrite(led, HIGH); 
+      delay(1500);                
+      digitalWrite(led, LOW); 
    }
    voltage = avergearray(pHArray, ArrayLenth)*5.0/1024;
    return voltage;
+}
+
+void blinkLED(int delays){
+  //Blink 
+  digitalWrite(led, HIGH);   
+  delay(delays);               
+  digitalWrite(led, LOW);   
+  delay(delays); 
+  digitalWrite(led, HIGH);   
+  delay(delays);               
+  digitalWrite(led, LOW);   
+  delay(delays); 
+  digitalWrite(led, HIGH);   
+  delay(delays);               
+  digitalWrite(led, LOW);   
+  delay(delays);
 }
 
   
@@ -140,7 +164,7 @@ void setup(void) {
   configure_wdt();
 }
 void loop(void) {
-
+  blinkLED(200);
   //hent_pH_funksjon
   float pH = getPh();
   int ipH = (int) (pH*100);
@@ -164,7 +188,9 @@ void loop(void) {
 
   // Send it off
   ttn.sendBytes(data, sizeof(data));
-  sleep(1);
+  //Blink slow to indicate it is going to sleep
+  blinkLED(500);
+  sleep(2);
 
 }
 
@@ -172,13 +198,15 @@ void loop(void) {
 /*****************     SLEEP FUNCTION    ******************************/
 /**********************************************************************/
 
-void sleep(int minutes)
+void sleep(int ncycles)
 {
-  int ncycles = minutes*60/8;
+  //int ncycles = minutes*60/8;
+  digitalWrite(pHpwr, LOW);
   nbr_remaining = ncycles; // defines how many cycles should sleep
 
   // Set sleep to full power down.  Only external interrupts or
   // the watchdog timer can wake the CPU!
+  
   set_sleep_mode(SLEEP_MODE_PWR_DOWN);
 
   // Turn off the ADC while asleep.
@@ -203,6 +231,8 @@ void sleep(int minutes)
 
   // put everything on again
   power_all_enable();
+
+  
 
 }
 

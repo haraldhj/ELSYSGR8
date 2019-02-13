@@ -192,6 +192,7 @@ void loop(void) {
   // Send it off
   ttn.sendBytes(data, sizeof(data));
 <<<<<<< HEAD
+<<<<<<< HEAD
   //Blink slow to indicate it is going to sleep
   blinkLED(500);
   sleep(2);
@@ -199,6 +200,9 @@ void loop(void) {
 =======
   sleep(1);
 >>>>>>> 0311f228c7feb180a36bae29b3b41cd4036981a7
+=======
+  sleep(sleepCycles);
+>>>>>>> 6030e5aad9a734e6c757764bf6631f7b6a2d1484
 }
 
 /**********************************************************************/

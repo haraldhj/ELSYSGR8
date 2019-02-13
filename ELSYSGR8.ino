@@ -167,7 +167,7 @@ void loop(void) {
 
   // Send it off
   ttn.sendBytes(data, sizeof(data));
-  sleep(1);
+  sleep(sleepCycles);
 }
 
 /**********************************************************************/

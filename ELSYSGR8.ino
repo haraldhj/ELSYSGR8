@@ -8,6 +8,7 @@
 #include <avr/power.h>          // library for power control
 const char *appEui = "70B3D57ED0016991";
 const char *appKey = "ADC0FC64BD8E8960175B349BE5CFD3AA";
+int sleepCycles = 1;
 
 #define loraSerial Serial1
 #define debugSerial Serial
@@ -131,6 +132,7 @@ void setup(void) {
 
   debugSerial.println("-- JOIN");
   ttn.join(appEui, appKey);
+  ttn.onMessage(message);
 
   // start serial port
    Serial.begin(9600);
@@ -139,6 +141,7 @@ void setup(void) {
 
   configure_wdt();
 }
+
 void loop(void) {
 
   //hent_pH_funksjon
@@ -165,7 +168,6 @@ void loop(void) {
   // Send it off
   ttn.sendBytes(data, sizeof(data));
   sleep(1);
-
 }
 
 /**********************************************************************/
@@ -206,6 +208,23 @@ void sleep(int minutes)
 
 }
 
+/**********************************************************************/
+/******************   MESSAGE FUNCTION   ******************************/
+/**********************************************************************/
+
+int secsToCycles(int secs) {
+  float dsdc = secs / 8.0;
+  int cycles = (int) ceil(dsdc);
+  return cycles;
+}
+
+void message(const byte* payload, int length, int port) {
+  if ((length == 1) && (port == 1)) {
+      int secs = payload[0];
+      int cycles = secsToCycles(secs);
+      sleepCycles = cycles;
+    }
+}
 
 /******* Dette må bare være med, **********
  ******* så ikke interrupt kaller på en ***
